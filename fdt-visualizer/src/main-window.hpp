@@ -24,6 +24,8 @@ public:
     ~MainWindow();
 
     void open_file_dialog();
+    QString run_dtdiff(const QString& file1, const QString& file2);
+    void onButtonClick();
     void open_directory_dialog();
 
     void open_directory(const string &path);

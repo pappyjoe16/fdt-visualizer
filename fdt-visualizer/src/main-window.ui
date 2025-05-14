@@ -26,6 +26,34 @@
      </widget>
     </item>
     <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <item>
+     <widget class="QLineEdit" name="path_2">
+     <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="placeholderText">
+       <string>fdt://</string>
+      </property>
+     </widget>
+     </item>
+     <item>
+     <widget class="QPushButton" name="load_dtb2">
+      <property name="text">
+         <string>Load DTB 2</string>
+        </property>
+     </widget>
+        </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QPushButton" name="diffButton">
+      <property name="text">
+         <string>Diff</string>
+        </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>

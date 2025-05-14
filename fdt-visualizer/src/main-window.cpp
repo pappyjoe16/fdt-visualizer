@@ -1,6 +1,10 @@
 #include "main-window.hpp"
 #include "ui_main-window.h"
 
+#include <iostream>
+#include <string>
+#include <cstdlib>
+
 #include <QAction>
 #include <QByteArray>
 #include <QDir>
@@ -8,6 +12,11 @@
 #include <QFile>
 #include <QMessageBox>
 #include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QMouseEvent>
+#include <QEvent>
+#include <QProcess>
+#include <QString>
 
 #include <dialogs.hpp>
 #include <endian-conversions.hpp>
@@ -26,6 +35,7 @@ MainWindow::MainWindow(QWidget *parent)
         , m_ui(std::make_unique<Ui::MainWindow>()) {
     setWindowIcon(QIcon(":/resources/fdt-viewer.svg"));
     m_ui->setupUi(this);
+    m_ui->treeWidget->setSelectionMode(QTreeWidget::MultiSelection);
     m_ui->preview->setCurrentWidget(m_ui->text_view_page);
     m_ui->splitter->setEnabled(false);
 
@@ -57,6 +67,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_menu.get(), &menu_manager::open_directory, this, [this]() {
         fdt::open_directory_dialog(this, [this](auto &&...values) { open_directory(std::forward<decltype(values)>(values)...); });
+    });
+    connect(m_ui->load_dtb2, &QPushButton::clicked, this, [this]() {
+        fdt::open_file_dialog(this, [this](auto &&...values) { open_file(std::forward<decltype(values)>(values)...); });
     });
 
     connect(m_ui->quick_search, &QLineEdit::textEdited, this, [this](const QString &text) {
@@ -91,6 +104,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(m_ui->treeWidget, &QTreeWidget::itemSelectionChanged, this, &MainWindow::update_view);
+    connect(m_ui->diffButton, &QPushButton::clicked, this, &MainWindow::onButtonClick);
 
     viewer_settings settings;
     m_ui->text_view->setWordWrapMode(settings.view_word_wrap.value() ? QTextOption::WordWrap : QTextOption::NoWrap);
@@ -102,6 +116,38 @@ MainWindow::MainWindow(QWidget *parent)
 
     if (!rect.isEmpty())
         setGeometry(rect);
+}
+
+void MainWindow::onButtonClick() {
+    m_ui->diffButton->setText("Clicked");
+}
+
+// void MainWindow::run_dtdiff(const std::string& file1, const std::string& file2) {
+//     std::string command = "dtdiff \"" + file1 + "\" \"" + file2 + "\"";
+//     int result = system(command.c_str());
+//     if (result != 0) {
+//         std::cerr << "dtdiff failed with return code: " << result << std::endl;
+//     }
+// }
+
+
+QString MainWindow::run_dtdiff(const QString& file1, const QString& file2) {
+    QProcess process;
+
+    // Set up the arguments
+    QStringList arguments;
+    arguments << file1 << file2;
+
+    // Run the process and wait for it to finish
+    process.start("dtdiff", arguments);
+    if (!process.waitForFinished()) {
+        return QString("Error: dtdiff command failed to run or did not finish.");
+    }
+
+    // Read standard output
+    QString output = process.readAllStandardOutput();
+
+    return output;
 }
 
 MainWindow::~MainWindow() {
@@ -155,7 +201,7 @@ void MainWindow::update_fdt_path(QTreeWidgetItem *item) {
 
     m_fdt = root;
 
-    m_ui->statusbar->showMessage("file://" + root->data(0, QT_ROLE_FILEPATH).toString());
+    // m_ui->statusbar->showMessage("file://" + root->data(0, QT_ROLE_FILEPATH).toString());
     m_ui->path->setText("fdt://" + path);
 }
 
@@ -175,7 +221,25 @@ void MainWindow::update_view() {
     }
 
     const auto item = m_ui->treeWidget->selectedItems().first();
+    m_ui->path_2->clear();
 
+    if (m_ui->treeWidget->selectedItems().size() == 2) {
+        m_ui->text_view->clear();
+        m_ui->statusbar->clearMessage();
+        m_ui->path->clear();
+        
+        QString first_Item = m_ui->treeWidget->selectedItems().first()->text(0);
+        QString second_Item = m_ui->treeWidget->selectedItems().last()->text(0);
+        m_ui->path_2->setText("fdt://" + second_Item);
+        
+        m_ui->statusbar->showMessage("Comparing " + first_Item + " and " + second_Item);
+        
+        
+    }
+    else {
+        m_ui->statusbar->showMessage("fdt://" + item->text(0));
+    }
+    
     const auto type = item->data(0, QT_ROLE_NODETYPE).value<NodeType>();
     m_ui->preview->setCurrentWidget(NodeType::Node == type ? m_ui->text_view_page : m_ui->property_view_page);
 
@@ -191,7 +255,15 @@ void MainWindow::update_view() {
     ret.reserve(VIEW_TEXT_CACHE_SIZE);
 
     fdt::fdt_view_dts(item, ret);
-    m_ui->text_view->setText(ret);
+    if (m_ui->treeWidget->selectedItems().size() == 2){
+        
+        QString diff_out = run_dtdiff(QString(m_ui->treeWidget->selectedItems().first()->data(0, QT_ROLE_FILEPATH).toString()), QString( m_ui->treeWidget->selectedItems().last()->data(0, QT_ROLE_FILEPATH).toString()));
+        m_ui->text_view->setText(diff_out);
+    }
+    else{
+        m_ui->text_view->setText(ret);
+    }
+    
 }
 
 void MainWindow::property_export() {

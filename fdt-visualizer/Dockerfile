@@ -21,6 +21,8 @@ RUN apt-get update && \
     apt-transport-https \
     ca-certificates \
     gnupg \
+    #install dtc library
+    device-tree-compiler \
     software-properties-common && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -131,6 +133,8 @@ RUN apt-get update && \
     xauth \
     netcat-openbsd \
     procps \
+    #install dtc library
+    device-tree-compiler \
     psmisc && \
     # Create required directories
     mkdir -p /var/log/supervisor
