@@ -17,6 +17,7 @@
 #include <QEvent>
 #include <QProcess>
 #include <QString>
+#include <QTextStream>
 
 #include <dialogs.hpp>
 #include <endian-conversions.hpp>
@@ -35,7 +36,9 @@ MainWindow::MainWindow(QWidget *parent)
         , m_ui(std::make_unique<Ui::MainWindow>()) {
     setWindowIcon(QIcon(":/resources/fdt-viewer.svg"));
     m_ui->setupUi(this);
-    m_ui->treeWidget->setSelectionMode(QTreeWidget::MultiSelection);
+    m_ui->treeWidget->setSelectionMode(QTreeWidget::ExtendedSelection);
+    //m_ui->treeWidget->setSelectionBehavior(QTreeWidget::SelectRows);
+
     m_ui->preview->setCurrentWidget(m_ui->text_view_page);
     m_ui->splitter->setEnabled(false);
 
@@ -104,7 +107,6 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(m_ui->treeWidget, &QTreeWidget::itemSelectionChanged, this, &MainWindow::update_view);
-    connect(m_ui->diffButton, &QPushButton::clicked, this, &MainWindow::onButtonClick);
 
     viewer_settings settings;
     m_ui->text_view->setWordWrapMode(settings.view_word_wrap.value() ? QTextOption::WordWrap : QTextOption::NoWrap);
@@ -118,35 +120,54 @@ MainWindow::MainWindow(QWidget *parent)
         setGeometry(rect);
 }
 
-void MainWindow::onButtonClick() {
-    m_ui->diffButton->setText("Clicked");
-}
-
-// void MainWindow::run_dtdiff(const std::string& file1, const std::string& file2) {
-//     std::string command = "dtdiff \"" + file1 + "\" \"" + file2 + "\"";
-//     int result = system(command.c_str());
-//     if (result != 0) {
-//         std::cerr << "dtdiff failed with return code: " << result << std::endl;
-//     }
-// }
-
-
 QString MainWindow::run_dtdiff(const QString& file1, const QString& file2) {
     QProcess process;
 
-    // Set up the arguments
     QStringList arguments;
     arguments << file1 << file2;
 
-    // Run the process and wait for it to finish
     process.start("dtdiff", arguments);
     if (!process.waitForFinished()) {
         return QString("Error: dtdiff command failed to run or did not finish.");
     }
-
-    // Read standard output
     QString output = process.readAllStandardOutput();
 
+    return output;
+}
+
+void MainWindow::writeToTempFile(const QString& content, QTemporaryFile& tempFile) {
+    if (tempFile.open()) {
+        QTextStream out(&tempFile);
+        out << content;
+        out.flush();
+        tempFile.close();
+        qDebug() << "Written to:" << tempFile.fileName();
+    } else {
+        qWarning() << "Failed to open temporary file.";
+    }
+}
+
+QString MainWindow::run_nodediff(const QString& node1, const QString& node2) {
+    
+    QTemporaryFile tempFile1(QDir::tempPath() + "/nodefile1XXXXXX.txt");
+    tempFile1.setAutoRemove(false);
+    writeToTempFile(node1, tempFile1);
+
+    QTemporaryFile tempFile2(QDir::tempPath() + "/nodefile2XXXXXX.txt");
+    tempFile2.setAutoRemove(false);
+    writeToTempFile(node2, tempFile2);
+
+    QProcess process;
+
+    QStringList arguments;
+    arguments << QString("-u")  << QString("-a") << QFileInfo(tempFile1).absoluteFilePath() << QFileInfo(tempFile2).absoluteFilePath();
+    
+    process.start("diff", arguments);
+    if (!process.waitForFinished()) {
+        return QString("Error: diff command failed to run or did not finish.");
+    }
+    QString output = process.readAllStandardOutput();
+    
     return output;
 }
 
@@ -256,8 +277,27 @@ void MainWindow::update_view() {
 
     fdt::fdt_view_dts(item, ret);
     if (m_ui->treeWidget->selectedItems().size() == 2){
+        const auto item1 = m_ui->treeWidget->selectedItems().first();
+        const auto item2 = m_ui->treeWidget->selectedItems().last();
+
+        const auto path1 = item1->data(0, QT_ROLE_FILEPATH).toString();
+        const auto path2 = item2->data(0, QT_ROLE_FILEPATH).toString();
+        QString diff_out;
+
+        if (path1.contains(".dtb") && path2.contains(".dtb")) {
+            diff_out = run_dtdiff(QString(m_ui->treeWidget->selectedItems().first()->data(0, QT_ROLE_FILEPATH).toString()), QString(m_ui->treeWidget->selectedItems().last()->data(0, QT_ROLE_FILEPATH).toString()));
+        } else {
+            string ret1;
+            ret1.reserve(VIEW_TEXT_CACHE_SIZE);
+            fdt::fdt_view_dts(item1, ret1);
+
+            string ret2;
+            ret2.reserve(VIEW_TEXT_CACHE_SIZE);
+            fdt::fdt_view_dts(item2, ret2);
+
+            diff_out = run_nodediff(QString(ret1), QString(ret2));
+        }
         
-        QString diff_out = run_dtdiff(QString(m_ui->treeWidget->selectedItems().first()->data(0, QT_ROLE_FILEPATH).toString()), QString( m_ui->treeWidget->selectedItems().last()->data(0, QT_ROLE_FILEPATH).toString()));
         m_ui->text_view->setText(diff_out);
     }
     else{

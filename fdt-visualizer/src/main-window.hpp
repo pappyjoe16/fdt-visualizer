@@ -5,6 +5,8 @@
 #include <QMainWindow>
 #include <memory>
 
+#include <QTemporaryFile>
+
 #include <fdt/fdt-view.hpp>
 
 class QHexView;
@@ -25,7 +27,8 @@ public:
 
     void open_file_dialog();
     QString run_dtdiff(const QString& file1, const QString& file2);
-    void onButtonClick();
+    QString run_nodediff(const QString &node1, const QString &node2);
+    void writeToTempFile(const QString& content, QTemporaryFile& tempFile);
     void open_directory_dialog();
 
     void open_directory(const string &path);

@@ -40,18 +40,11 @@
      <item>
      <widget class="QPushButton" name="load_dtb2">
       <property name="text">
-         <string>Load DTB 2</string>
+         <string>Load DTB</string>
         </property>
      </widget>
         </item>
      </layout>
-    </item>
-    <item>
-     <widget class="QPushButton" name="diffButton">
-      <property name="text">
-         <string>Diff</string>
-        </property>
-     </widget>
     </item>
     <item>
      <widget class="QSplitter" name="splitter">

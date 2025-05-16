@@ -23,6 +23,7 @@ RUN apt-get update && \
     gnupg \
     #install dtc library
     device-tree-compiler \
+    diffutils \
     software-properties-common && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -135,6 +136,7 @@ RUN apt-get update && \
     procps \
     #install dtc library
     device-tree-compiler \
+    diffutils \
     psmisc && \
     # Create required directories
     mkdir -p /var/log/supervisor
